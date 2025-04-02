@@ -13,12 +13,17 @@ export class QueueController {
         if (isNaN(number)) {
             return res.status(400).send("Invalid number");
         }
-        await this.redisService.pushToQueue(number);
-        res.send(`Number ${number} added to queue.`);
+
+        const isNew = await this.redisService.tryAddUniqueNumber(number);
+        if (isNew) {
+            res.send(`Number ${number} successfully added as unique.`);
+        } else {
+            res.status(409).send(`Number ${number} is already added.`);
+        }
     }
 
-    async getQueue(req: Request, res: Response) {
-        const queueContent = await this.redisService.peekQueue();
-        res.json(queueContent);
+    async getNumbersCount(req: Request, res: Response) {
+        const count = await this.redisService.getUniqueCount();
+        res.json({ uniqueNumbersCount: count });
     }
 }

@@ -5,6 +5,7 @@ import { ResultStorage } from "./services/ResultStorage";
 import { QueueController } from "./controllers/QueueController";
 import { Producer } from "./producers/Producer";
 import { Consumer } from "./consumers/Consumer";
+import {NumberResult} from "./models/NumberResult";
 
 const app = express();
 const port = 3000;
@@ -21,20 +22,6 @@ app.use(express.json());
 redisService.redis.ping()
     .then((response) => console.log("Redis connection status:", response))
     .catch((error) => console.error("Redis connection error:", error));
-
-
-app.post("/queue", (req: Request, res: Response) => {
-    queueController.addNumber(req, res).catch((err) => {
-        console.error(err);
-        res.status(500).send("Internal Server Error");
-    });
-});
-app.get("/queue", (req: Request, res: Response) => {
-    queueController.getQueue(req, res).catch((err) => {
-        console.error(err);
-        res.status(500).send("Internal Server Error");
-    });
-});
 
 app.get("/", (req: Request, res: Response) => {
     res.send("Hello, World! Queue system is running.");
@@ -54,19 +41,46 @@ app.listen(port, () => {
         producerTasks.push(producer.start());
     }
 
-    const consumer = new Consumer(redisService);
+    const consumerCount = 5;
+    const numberPerConsumer = Math.ceil(config.numberRange / consumerCount);
 
-    console.log("Starting background processing...");
+    const consumers: Consumer[] = [];
+    const allResults: NumberResult[] = [];
+
+    console.log("Запуск параллельных потребителей...");
+
+    const consumerTasks = [];
+
+    for (let i = 0; i < consumerCount; i++) {
+        const consumer = new Consumer(redisService, `consumer-${i}`);
+        consumers.push(consumer);
+        const task = consumer.start(numberPerConsumer);
+        consumerTasks.push(task);
+    }
+
     const startTime = Date.now();
+    const results = await Promise.all(consumerTasks);
 
-    const results = await consumer.start(config.numberRange);
+    results.forEach(res => allResults.push(...res));
+
+    const uniqueNumbers = Array.from(new Set(allResults.map(res => res.number))).sort((a, b) => a - b);
 
     producers.forEach((producer) => producer.stop());
     await Promise.all(producerTasks);
 
     const timeSpent = Date.now() - startTime;
-    await resultStorage.saveResults(timeSpent, results);
+
+    await resultStorage.saveResults(
+        timeSpent,
+        uniqueNumbers.map((number) => ({ number, generatedAt: new Date().toISOString() }))
+    );
 
     redisService.disconnect();
-    console.log("Background processing finished successfully!");
+    const seconds = Math.floor(timeSpent / 1000);
+    const milliseconds = timeSpent % 1000;
+    console.log(`Фоновый процесс завершён за ${seconds} секунд и ${milliseconds} миллисекунд`);
+
+    console.log("Фоновый процесс успешно завершён!");
 })();
+
+

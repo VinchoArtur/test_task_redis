@@ -5,7 +5,7 @@ dotenv.config();
 
 export const config = {
     redis: {
-        queueName: "numberQueue",
+        queueName: "numberQueueStream",
         host: "127.0.0.1",
         port: 6379
     },

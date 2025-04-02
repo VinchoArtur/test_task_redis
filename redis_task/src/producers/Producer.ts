@@ -1,5 +1,4 @@
 import { RedisService } from "../services/RedisService";
-import { sleep } from "../utils/sleep";
 
 export class Producer {
     private readonly id: number;
@@ -11,15 +10,16 @@ export class Producer {
         this.id = id;
         this.range = range;
         this.redisService = redisService;
-        this.keepRunning = true; // Флаг для остановки
+        this.keepRunning = true;
     }
 
     async start(): Promise<void> {
         while (this.keepRunning) {
             const randomNumber = Math.floor(Math.random() * this.range);
-            await this.redisService.pushToQueue(randomNumber);
-            console.log(`Producer #${this.id} generated: ${randomNumber}`);
-            // await sleep(50);
+            const isNew = await this.redisService.tryAddUniqueNumber(randomNumber);
+            if (isNew) {
+                console.log(`Producer #${this.id} добавил уникальное: ${randomNumber}`);
+            }
         }
     }
 
