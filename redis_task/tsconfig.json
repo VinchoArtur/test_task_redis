@@ -1,0 +1,11 @@
+{
+  "compilerOptions": {
+    "outDir": "./dist",      // Куда попадут скомпилированные файлы
+    "rootDir": "./src",      // Исходная папка исходного кода
+    "target": "ES6",         // Целевой стандарт JS
+    "module": "commonjs",    // Для поддержки require/exports
+    "esModuleInterop": true  // Импорт/экспорт совместимость
+  },
+  "include": ["src/**/*"],   // Какие файлы TypeScript включить
+  "exclude": ["node_modules"] // Исключение node_modules
+}
