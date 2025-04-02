@@ -3,8 +3,8 @@ import { config } from "../configs/config";
 
 export class RedisService {
     public redis: Redis;
-    private readonly streamName: string;
-    private readonly setName: string;
+    public streamName: string;
+    public setName: string;
 
     constructor(streamName: string) {
         this.redis = new Redis({
@@ -20,7 +20,7 @@ export class RedisService {
         pipeline.sadd(this.setName, number.toString());
         pipeline.xadd(this.streamName, "*", "number", number.toString(), "generatedAt", new Date().toISOString());
         const [setResult, streamResult] = await pipeline.exec();
-        return !!setResult[1]; // результат выполнения sadd
+        return !!setResult[1];
     }
 
     async createConsumerGroup(groupName: string): Promise<void> {
@@ -71,5 +71,19 @@ export class RedisService {
 
     disconnect(): void {
         this.redis.disconnect();
+    }
+
+    async readPendingMessages(
+      groupName: string,
+      consumerId: string,
+      count = 200
+    ): Promise<[string, number, string][]> {
+        const pendingMessages = await this.redis.xpending(this.streamName, groupName, "-", "+", count, consumerId);
+        if (!pendingMessages || pendingMessages.length === 0) return [];
+        return pendingMessages.map(([id, data]) => [
+            id,
+            Number(data[1]),
+            data[3]
+        ]);
     }
 }
